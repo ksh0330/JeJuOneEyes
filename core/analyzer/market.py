@@ -16,6 +16,7 @@ PLAN_VALIDATOR = Draft202012Validator(
 DATASET = json.loads((CONTRACTS / "examples" / "catalog.json").read_text(encoding="utf-8"))[
     "datasets"
 ][0]
+SOURCE_YEAR = 2019
 REGIONS = {"jeju.yeon_dong": "연동", "jeju.nohyeong_dong": "노형동"}
 INDUSTRIES = {"food.korean_restaurant": "한식 음식점업"}
 CARD_AMOUNT = "card_amount_krw"
@@ -133,9 +134,11 @@ def run_analysis(plan: dict, csv_path: Path | str) -> dict:
     regions = {REGIONS[region_id] for region_id in plan["region_ids"]}
     industries = {INDUSTRIES[industry_id] for industry_id in plan["industry_ids"]}
     try:
-        observations = read_market_rows(Path(csv_path), DATASET["columns"], "제주시", regions, requested_months)
+        observations = read_market_rows(
+            Path(csv_path), DATASET["columns"], "제주시", regions, requested_months, source_year=SOURCE_YEAR
+        )
     except OSError:
-        return _result("unavailable", [_issue("source_unavailable", "원출처에서 받은 2019년 공개 CSV를 연결해 주세요.")])
+        return _result("unavailable", [_issue("source_unavailable", f"원출처에서 받은 {SOURCE_YEAR}년 공개 CSV를 연결해 주세요.")])
     except (UnicodeError, ValueError) as exc:
         message = "공개 CSV를 UTF-8 또는 CP949로 읽을 수 없습니다." if isinstance(exc, UnicodeError) else str(exc)
         return _result("error", [_issue("invalid_source", message, "error")])
@@ -163,7 +166,19 @@ def run_analysis(plan: dict, csv_path: Path | str) -> dict:
                 grouped[group_key][metric] += metric_values[region, month]
 
     columns = [{"id": key, "label": DIMENSIONS[key], "unit": None, "method": None} for key in plan["group_by"]]
-    columns.extend({"id": metric, **METRICS[metric]} for metric in plan["metrics"])
+    for metric in plan["metrics"]:
+        column = {"id": metric, **METRICS[metric]}
+        if metric == CARD_AMOUNT and not industries:
+            column["label"] = "관측된 업종·성별의 카드 이용금액 소계"
+            column["method"] = "CSV에 관측된 업종·성별 행의 이용금액 합계"
+            issues.append(
+                _issue(
+                    "observed_card_subtotal",
+                    "전체 업종 조회에는 업종·성별 자료가 빠져 있을 수 있습니다. "
+                    "금액은 CSV에서 관측된 행의 소계입니다.",
+                )
+            )
+        columns.append(column)
     rows = [
         {
             **dict(zip(plan["group_by"], group_key)),

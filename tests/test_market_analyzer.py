@@ -72,6 +72,48 @@ class MarketAnalysisTest(unittest.TestCase):
         self.assertEqual(result["status"], "needs_input")
         self.assertEqual(result["issues"][0]["code"], "invalid_plan")
 
+    def test_all_industries_discloses_observed_subtotal_when_a_row_is_missing(self):
+        self.plan["region_ids"] = ["jeju.yeon_dong"]
+        self.plan["industry_ids"] = []
+        self.plan["period"]["end_month"] = "2019-01"
+        self.write_rows([
+            ["2019-01-01", "제주시", "연동", "한식 음식점업", "남성", 100, 3],
+            ["2019-01-01", "제주시", "연동", "한식 음식점업", "여성", 100, 4],
+            ["2019-01-01", "제주시", "연동", "중식 음식점업", "남성", 70, 3],
+        ])
+
+        result = run_analysis(self.plan, self.csv_path)
+
+        RESULT.validate(result)
+        self.assertEqual(result["rows"], [{"region": "연동", "card_amount_krw": 270}])
+        self.assertIn("소계", result["columns"][1]["label"])
+        self.assertEqual(result["issues"][0]["code"], "observed_card_subtotal")
+        self.assertEqual(result["issues"][0]["severity"], "warning")
+
+    def test_wrong_year_is_rejected_even_outside_the_requested_filters(self):
+        self.plan["region_ids"] = ["jeju.yeon_dong"]
+        cases = [
+            ("2020-01", "연동", "2020"),
+            ("2019-01", "노형동", "2019년과 다른"),
+        ]
+        for month, wrong_year_region, expected_message in cases:
+            with self.subTest(month=month, wrong_year_region=wrong_year_region):
+                self.plan["period"] = {"start_month": month, "end_month": month}
+                self.write_rows([
+                    ["2019-01-01", "제주시", "연동", "한식 음식점업", "남성", 12, 3],
+                    ["2019-01-01", "제주시", "연동", "한식 음식점업", "여성", 12, 4],
+                    ["2020-01-01", "제주시", wrong_year_region, "한식 음식점업", "남성", 15, 3],
+                    ["2020-01-01", "제주시", wrong_year_region, "한식 음식점업", "여성", 15, 4],
+                ])
+
+                result = run_analysis(self.plan, self.csv_path)
+
+                RESULT.validate(result)
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["issues"][0]["code"], "invalid_source")
+                self.assertIn(expected_message, result["issues"][0]["message"])
+                self.assertEqual(result["sources"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

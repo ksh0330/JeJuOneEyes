@@ -17,7 +17,13 @@ class MarketRow:
 
 
 def read_market_rows(
-    csv_path: Path, columns: dict[str, str], city: str, regions: set[str], months: set[str]
+    csv_path: Path,
+    columns: dict[str, str],
+    city: str,
+    regions: set[str],
+    months: set[str],
+    *,
+    source_year: int,
 ) -> list[MarketRow]:
     """Read the public extract without changing the original file."""
     raw = csv_path.read_bytes()
@@ -32,13 +38,21 @@ def read_market_rows(
 
     rows = []
     for raw_row in reader:
+        try:
+            observed_date = date.fromisoformat(raw_row[columns["month"]])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"CSV {reader.line_num}행의 날짜 형식을 확인해 주세요.") from exc
+        if observed_date.year != source_year:
+            raise ValueError(
+                f"CSV {reader.line_num}행에 등록 연도 {source_year}년과 다른 "
+                f"{observed_date.year}년 자료가 있습니다. {source_year}년 원본 CSV를 연결해 주세요."
+            )
+
         region = raw_row[columns["region"]]
-        if raw_row[columns["city"]] != city or region not in regions:
+        month = observed_date.isoformat()[:7]
+        if raw_row[columns["city"]] != city or region not in regions or month not in months:
             continue
         try:
-            month = date.fromisoformat(raw_row[columns["month"]]).isoformat()[:7]
-            if month not in months:
-                continue
             amount = raw_row[columns["card_amount"]].strip()
             population = raw_row[columns["visit_population"]].strip()
             visit_population = Decimal(population) if population else None
@@ -55,5 +69,5 @@ def read_market_rows(
                 )
             )
         except (AttributeError, TypeError, ValueError, InvalidOperation) as exc:
-            raise ValueError(f"CSV {reader.line_num}행의 날짜나 수치 형식을 확인해 주세요.") from exc
+            raise ValueError(f"CSV {reader.line_num}행의 수치 형식을 확인해 주세요.") from exc
     return rows
