@@ -11,11 +11,12 @@
 | 데이터 활용 명세 | [데이터 활용 명세](DATA_SPEC.md), 아래 외부 데이터·오픈소스 목록 |
 | 결과 설명자료 | [결과 보고서](RESULT_REPORT.md)(문제 정의, Agent 구조, 주요 기능, 실행 결과, 검증·한계, 센터 활용), [최종 실행 확인](FINAL_CHECK.md), [최종 화면](assets/final/), [공통 설계](ARCHITECTURE.md), [입도객·결합 요청 시연 기록](RECENT_ARRIVALS_DEMO.md), [제품 요구사항](../AGENTS.md) |
 
-## 사용 모델과 Prompt
+## 사용 모델과 AI 활용 범위
 
-- **제품 실행.** 제출 앱은 규칙 기반 플래너(`core/planner/`)로 질문을 분석 계획 JSON으로 바꾸고, 로컬 Python 엔진(`core/analyzer/`)이 집계한다. 실행 중 언어 모델을 호출하지 않으므로 제품 Prompt와 API Key가 없다. 같은 자료와 조건에서는 같은 결과가 나온다.
-- **로컬 SLM 시험(개인 PC 실험).** 팀원 개인 Windows PC(Intel i5-7200U, CPU 2스레드)에서 Qwen2.5-0.5B-Instruct Q4_K_M(llama.cpp b12541)을 의도·조건 추출에 시험했다. 5개 질문 중 모든 조건을 맞힌 응답이 없었고 질문당 6.02~12.27초가 걸려 제품에 연결하지 않았다. 센터 기준 PC(i7-8700, RAM 32GB)에서는 실측하지 않았다. 측정 내용은 [입도객·결합 요청 시연 기록](RECENT_ARRIVALS_DEMO.md)에 있다.
-- **개발 보조 AI.** 팀은 코드 구현·리뷰와 문서 작성에 Anthropic Claude(Claude Code)와 OpenAI Codex를 사용했다. 시작 Prompt는 [팀 작업 가이드](TEAM_WORKFLOW.md)에 있다. 수치와 기능 설명은 실제 실행 결과와 대조했다. 센터 원자료와 실제 키는 AI 도구에 입력하지 않았다.
+- **제품 실행.** 규칙 기반 플래너(`core/planner/`)와 로컬 Python 분석 엔진(`core/analyzer/`)을 사용한다. 실행 시 LLM·외부 AI API를 호출하지 않는다. 따라서 제품 Prompt와 API Key가 없고, 같은 자료와 조건에서는 같은 결과가 나온다.
+- **개발 보조.** Claude Code와 OpenAI Codex를 코드 구현·검토 및 문서 작성 보조에 사용했다. 시작 Prompt는 [팀 작업 가이드](TEAM_WORKFLOW.md)에 있다. 수치와 기능 설명은 실제 실행 결과와 대조했고, 센터 원자료와 실제 키는 AI 도구에 입력하지 않았다.
+- **로고 제작.** Google Gemini를 제주한눈 가로형 로고 이미지(`app/assets/logo_wordmark.png`) 제작에 사용했다.
+- **모델 실험.** Qwen2.5-0.5B-Instruct Q4_K_M을 개인 PC에서 질문의 의도·조건 추출용으로 시험했으며 제출 앱에는 적용하지 않았다. 팀원 개인 Windows PC(Intel i5-7200U, CPU 2스레드, llama.cpp b12541)에서 5개 질문 중 모든 조건을 맞힌 응답이 없었고 질문당 6.02~12.27초가 걸렸다. 센터 기준 PC(i7-8700, RAM 32GB)에서는 실측하지 않았다. 측정 내용은 [입도객·결합 요청 시연 기록](RECENT_ARRIVALS_DEMO.md)에 있다.
 
 ## 외부 데이터
 
