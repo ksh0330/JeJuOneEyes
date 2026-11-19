@@ -463,7 +463,11 @@ def render_turns() -> None:
         suggestion_cols = st.columns(len(vocab.FOLLOWUP_SUGGESTIONS))
         for column, suggestion in zip(suggestion_cols, vocab.FOLLOWUP_SUGGESTIONS):
             column.button(suggestion, key=f"suggest_{suggestion}", on_click=submit_followup, args=(suggestion,), width="stretch")
-    st.text_input("후속 요청", key="followup_text", placeholder="예: 7~8월 빼고 다시 / 노형동만 / 방문인구도 같이")
+    followup_example = (
+        "예: 2025년 9월 제주 입도객을 전년 동월과 비교해줘"
+        if is_arrivals else "예: 7~8월 빼고 다시 / 노형동만 / 방문인구도 같이"
+    )
+    st.text_input("후속 요청", key="followup_text", placeholder=followup_example)
     st.button("후속 요청 실행", on_click=submit_followup, type="primary")
     if not is_arrivals:
         with st.expander("선택지로 현재 조건 직접 수정"):
