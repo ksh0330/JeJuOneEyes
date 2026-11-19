@@ -131,7 +131,7 @@ def extract(text: str) -> Extraction:
         if industry_ids:
             found.industry_ids = industry_ids
         unsupported = [word for word in vocab.UNSUPPORTED_INDUSTRY_WORDS if word in text]
-        if unsupported and not industry_ids:
+        if unsupported:
             found.problems.append(
                 f"'{unsupported[0]}' 업종은 이 시연에서 아직 분석하지 않습니다. "
                 "한식 음식점업 또는 전체 업종(관측 소계)을 선택해 주세요."
@@ -184,6 +184,12 @@ def extract(text: str) -> Extraction:
 def _period(year: int, months: list[int] | None) -> dict:
     first, last = (min(months), max(months)) if months else (1, 12)
     return {"start_month": f"{year}-{first:02d}", "end_month": f"{year}-{last:02d}"}
+
+
+def _unselected_months(months: list[int] | None) -> set[int]:
+    if not months:
+        return set()
+    return set(range(min(months), max(months) + 1)).difference(months)
 
 
 def _group_by(operation: str) -> list[str]:
@@ -331,7 +337,7 @@ def plan_from_text(text: str) -> PlannerResponse:
                 )
             )
             industry_ids = []
-    exclude = set(found.exclude_add) - found.exclude_remove
+    exclude = (_unselected_months(found.months) | found.exclude_add) - found.exclude_remove
     if found.ambiguous_summer:
         clarifications.append(_summer_question())
 
@@ -408,14 +414,15 @@ def apply_followup(previous: dict, text: str) -> PlannerResponse:
         plan["operation"] = found.operation
 
     year = found.year or int(plan["period"]["start_month"][:4])
+    exclude = set() if found.clear_excludes else set(plan["exclude_months"])
     if found.months:
         plan["period"] = _period(year, found.months)
+        exclude = _unselected_months(found.months)
     elif found.year:
         plan["period"] = {
             "start_month": f"{year}-{plan['period']['start_month'][5:]}",
             "end_month": f"{year}-{plan['period']['end_month'][5:]}",
         }
-    exclude = set() if found.clear_excludes else set(plan["exclude_months"])
     exclude = (exclude | found.exclude_add) - found.exclude_remove
     plan["exclude_months"] = sorted(exclude)
     if found.ambiguous_summer:

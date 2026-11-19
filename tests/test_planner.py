@@ -61,6 +61,30 @@ class PlannerTest(unittest.TestCase):
         trend = apply_followup(first, "월별 추이로 바꿔줘").plan
         self.assertEqual((trend["operation"], trend["group_by"]), ("trend", ["region", "month"]))
 
+    def test_separate_months_keep_only_the_requested_months(self):
+        initial = plan_from_text(f"1월과 12월 {QUESTION}")
+        followup = apply_followup(plan_from_text(QUESTION).plan, "1월과 12월만 보여줘")
+        for response in (initial, followup):
+            self.assertEqual(response.status, READY)
+            self.assertEqual(response.plan["period"], {"start_month": "2019-01", "end_month": "2019-12"})
+            self.assertEqual(response.plan["exclude_months"], list(range(2, 12)))
+
+        new_range = apply_followup(followup.plan, "3~5월로 바꿔줘")
+        self.assertEqual(new_range.status, READY)
+        self.assertEqual(new_range.plan["period"], {"start_month": "2019-03", "end_month": "2019-05"})
+        self.assertEqual(new_range.plan["exclude_months"], [])
+
+    def test_mixed_industries_report_unsupported_instead_of_dropping_one(self):
+        baseline = plan_from_text(QUESTION).plan
+        initial = plan_from_text(QUESTION.replace("한식 음식점업", "한식과 중식 음식점업"))
+        followup = apply_followup(baseline, "한식과 중식으로 바꿔줘")
+
+        self.assertIsNone(initial.plan)
+        self.assertEqual(followup.plan, baseline)
+        for response in (initial, followup):
+            self.assertEqual(response.status, UNSUPPORTED)
+            self.assertIn("중식", response.notes[0])
+
     def test_ambiguous_summer_asks_which_months(self):
         first = plan_from_text(QUESTION).plan
         response = apply_followup(first, "여름 빼고 다시")
