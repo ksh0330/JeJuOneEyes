@@ -1,0 +1,50 @@
+# 분석 화면 실행
+
+자연어 질문, 안내형 선택지, 예시 질문으로 분석을 시작하고 "7~8월 빼고 다시" 같은 후속 요청으로 조건을 바꿔 재실행하는 Streamlit 화면이다. 분석은 [`core/analyzer`](../core/analyzer/README.md)의 `run_analysis(plan, csv_path)`, 계획은 [`core/planner`](../core/planner/README.md)가 만든다.
+
+## 준비
+
+1. [제주데이터허브 상권분석 매쉬업](https://jejudatahub.net/data/view/data/748) 첨부파일에서 `..._매쉬업결과_19.csv`(약 2.9MB)를 내려받아 원래 파일명 그대로 `data/local/`에 둔다. CSV는 Git과 제출 ZIP에서 제외한다.
+2. 저장소 루트에서 가상환경을 만들고 의존성을 설치한다.
+
+**macOS**
+
+```sh
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install -r app/requirements.txt
+./.venv/bin/python -m streamlit run app/main.py
+```
+
+**Windows PowerShell**
+
+```powershell
+py -3.12 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r app/requirements.txt
+./.venv/Scripts/python.exe -m streamlit run app/main.py
+```
+
+브라우저에서 `http://localhost:8501`을 연다. 사이드바에서 CSV 경로가 자동으로 잡히며, 다른 위치의 파일은 경로를 직접 입력한다.
+
+## 데이터 경계
+
+- 저장소 루트의 `.streamlit/config.toml`이 Streamlit 사용 통계 전송을 끄고(`gatherUsageStats = false`) 서버를 `localhost`에만 연다. 루트에서 실행해야 이 설정이 적용된다.
+- 질문, 원자료, 집계 결과는 이 PC에서만 처리한다. 화면의 출처 링크는 사용자가 누를 때만 열린다.
+- 결과 JSON 내려받기는 공개 자료 집계용이다. 센터 원자료 결과는 센터 반출 규정을 따른다.
+
+## 화면 구성
+
+| 단계 | 화면 요소 |
+| --- | --- |
+| 입력 | 업무 선택(예시 순서), 예시 질문 버튼(입력창에 불러와 수정), 자연어 입력, 안내형 선택지(목적 라디오, 지역·지표 체크박스, 업종 라디오, 기간, 제외 월) |
+| 계획 | 목적·지역·기간·업종·분석 단위·지표·제외 조건 표. 결과가 달라지는 조건이 빠지거나 '여름'처럼 뜻이 여러 가지면 라디오·체크박스로 확인 |
+| 결과 | 엔진 값만 쓴 요약, `columns[].label`과 단위를 머리글로 쓴 표, 지표별 차트(비교는 막대, 추이는 선) |
+| 근거 | 출처 링크, 실제 관측월, 요청으로 제외한 달, 계산에 쓰지 못한 달, 컬럼별 label·단위·계산 방법, `issues` 전체. 전체 업종 조회는 '관측 소계 안내'를 따로 강조 |
+| 후속 | 제안 버튼, 후속 요청 입력, 선택지로 현재 조건 수정, 바뀐 조건과 직전 결과 대비표, 변경 이력, 새 분석(조건 초기화) |
+
+## 검증
+
+```sh
+./.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+```
+
+`tests/test_app_flow.py`의 실제 CSV 검산과 Streamlit `AppTest` 화면 흐름은 `data/local/`에 2019년 CSV가 있을 때만 실행된다. 기준값은 연동 `33,833,494,533원`, 노형동 `32,321,443,476원`, 7~8월 제외 시 `28,067,882,813원`, `26,632,168,999원`이다.
