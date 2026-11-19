@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "ok",
+  "columns": [
+    { "id": "region", "label": "지역", "unit": null, "method": null },
+    { "id": "card_amount_krw", "label": "한식 음식점업 카드 이용액", "unit": "원", "method": "7~8월을 제외하고 지역별 이용금액을 합산" }
+  ],
+  "rows": [
+    { "region": "연동", "card_amount_krw": 28067882813 },
+    { "region": "노형동", "card_amount_krw": 26632168999 }
+  ],
+  "sources": [
+    {
+      "dataset_id": "hub.market_mashup_2019",
+      "title": "제주데이터허브 상권분석 매쉬업 2019",
+      "reference": "https://jejudatahub.net/data/view/data/748",
+      "observed_months": ["2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06", "2019-09", "2019-10", "2019-11", "2019-12"]
+    }
+  ],
+  "issues": []
+}

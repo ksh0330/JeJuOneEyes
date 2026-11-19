@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnalysisResult v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "columns", "rows", "sources", "issues"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "status": { "enum": ["ok", "needs_input", "no_data", "unavailable", "error"] },
+    "columns": { "type": "array", "items": { "$ref": "#/$defs/column" } },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": { "$ref": "#/$defs/id" },
+        "additionalProperties": { "type": ["string", "number", "null"] }
+      }
+    },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } }
+  },
+  "if": { "properties": { "status": { "const": "ok" } } },
+  "then": {
+    "properties": {
+      "rows": { "minItems": 1 },
+      "columns": { "minItems": 1 },
+      "sources": { "minItems": 1 }
+    }
+  },
+  "else": { "properties": { "rows": { "maxItems": 0 }, "issues": { "minItems": 1 } } },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "unit", "method"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "unit": { "type": ["string", "null"] },
+        "method": { "type": ["string", "null"] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset_id", "title", "reference", "observed_months"],
+      "properties": {
+        "dataset_id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "reference": { "type": "string", "minLength": 1 },
+        "observed_months": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/id" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
