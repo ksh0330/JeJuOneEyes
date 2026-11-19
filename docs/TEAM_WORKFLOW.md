@@ -14,7 +14,7 @@ git pull --ff-only origin main
 ```
 
 - 폴더를 Codex 앱에서 Local 프로젝트로 열거나, 그 폴더에서 `codex`를 실행한다. Claude Code는 작업 경로에서 `claude`를 실행한다. [AGENTS.md](../AGENTS.md)가 팀 공통 지침이며, [CLAUDE.md](../CLAUDE.md)가 이를 불러온다. 채팅에 전체 기획을 반복해서 붙여넣을 필요 없이, 아래 역할 프롬프트에 이번 작업을 추가한다. [Codex 프로젝트 지침](https://learn.chatgpt.com/docs/agent-configuration/agents-md) · [Claude Code 메모리](https://code.claude.com/docs/en/memory)
-- 첫 구현은 Python 3.11을 개발 환경 후보로 잡고, 실제로 설치한 버전과 패키지 목록, 실행 명령을 README에 적는다. 각자 `.venv`를 만들어 같은 버전으로 설치한다. 모델은 선택한 로컬 런타임의 동일한 파일과 버전을 쓴다. 개인 데이터 경로와 모델 경로는 `.env` 또는 구현이 정한 로컬 설정에서 지정한다. 설정 키를 코드에 넣는 PR이 같은 변경에서 사용법과 값 없는 `.env.example`을 추가한다.
+- 첫 구현은 Windows에서 실행한 Python 3.12를 개발 기준으로 사용한다. 실제 패키지 목록과 실행 명령은 구현 모듈 README에 적는다. 각자 `.venv`를 만들어 같은 버전으로 설치한다. 모델은 선택한 로컬 런타임의 동일한 파일과 버전을 쓴다. 개인 데이터 경로와 모델 경로는 `.env` 또는 구현이 정한 로컬 설정에서 지정한다. 설정 키를 코드에 넣는 PR이 같은 변경에서 사용법과 값 없는 `.env.example`을 추가한다.
 - 각자 [제주데이터허브 상권분석 매쉬업](https://jejudatahub.net/data/view/data/748)에서 `_19.csv`로 끝나는 같은 파일을 내려받고 원래 파일명 그대로 로컬에 저장한다. 데이터 파일은 Git이나 제출 ZIP에 넣지 않는다. 센터 데이터와 첨부 엑셀도 이용 권한이 있는 각자의 로컬 환경에 둔다. 팀 PR에서 공유하는 자료는 코드, 공유가 허용된 정제 스키마, 공개 가능한 집계 예시 또는 합성 예시다. 클라우드 에이전트에는 그 범위에서 필요한 내용만 전달한다.
 
 ### Windows와 macOS
@@ -23,8 +23,8 @@ git pull --ff-only origin main
 
 | 환경 | 가상환경 준비 예시 | 가상환경 Python |
 | --- | --- | --- |
-| Windows PowerShell | `py -3.11 -m venv .venv` | `./.venv/Scripts/python.exe` |
-| macOS 터미널 | `python3.11 -m venv .venv` | `./.venv/bin/python` |
+| Windows PowerShell | `py -3.12 -m venv .venv` | `./.venv/Scripts/python.exe` |
+| macOS 터미널 | `python3.12 -m venv .venv` | `./.venv/bin/python` |
 
 `requirements` 설치와 `python -m` 실행은 각 환경의 가상환경 Python에서 동일한 인자를 쓴다. 통합 시 Windows와 macOS에서 같은 공개 CSV와 분석 계획으로 한 번씩 결과를 비교한다. 팀원의 macOS 실행은 센터 Windows PC에서의 호환성 확인을 보완한다.
 

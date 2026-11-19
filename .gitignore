@@ -1,5 +1,7 @@
 *.xlsx
 *.key
+__pycache__/
+*매쉬업결과_19.csv
 /.worktrees/
 /data/raw/
 /data/local/
