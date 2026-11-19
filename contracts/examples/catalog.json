@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "datasets": [
+    {
+      "id": "hub.market_mashup_2019",
+      "title": "제주데이터허브 상권분석 매쉬업 2019",
+      "source_kind": "hub_public_file",
+      "reference": "https://jejudatahub.net/data/view/data/748",
+      "adapter": "hub_market_mashup_csv",
+      "region_scheme": "hub_market_mashup_2019_emd_labels",
+      "native_time_grain": "month",
+      "columns": {
+        "month": "년월",
+        "city": "시도명",
+        "region": "읍면동명",
+        "industry": "업종명",
+        "sex": "성별",
+        "card_amount": "이용금액",
+        "visit_population": "방문인구"
+      },
+      "metrics": [
+        {
+          "id": "card_amount_krw",
+          "value_column": "card_amount",
+          "unit": "원",
+          "grain": ["city", "region", "month", "industry", "sex"],
+          "aggregation": "sum"
+        },
+        {
+          "id": "visit_population_monthly_sum",
+          "value_column": "visit_population",
+          "unit": "방문 유동인구 월 누적 추정치",
+          "grain": ["city", "region", "month", "sex"],
+          "aggregation": "dedupe_equal_then_sum"
+        }
+      ]
+    }
+  ],
+  "joins": []
+}

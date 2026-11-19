@@ -1,5 +1,12 @@
-/제주데이터허브 데이터목록_20261105.xlsx
-/제주빅데이터센터_예시데이터 및 컬럼확인용.xlsx
+*.xlsx
+*.key
+__pycache__/
+*매쉬업결과_19.csv
+/.worktrees/
+/data/raw/
 /data/local/
 /.env
-/.env.local
+/.env.*
+!/.env.example
+/.venv/
+/submission/

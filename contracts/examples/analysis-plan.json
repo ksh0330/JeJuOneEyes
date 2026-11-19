@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "operation": "compare",
+  "period": { "start_month": "2019-01", "end_month": "2019-12" },
+  "region_ids": ["jeju.yeon_dong", "jeju.nohyeong_dong"],
+  "industry_ids": ["food.korean_restaurant"],
+  "metrics": ["card_amount_krw"],
+  "group_by": ["region"],
+  "exclude_months": [7, 8]
+}
