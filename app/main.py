@@ -71,6 +71,21 @@ QUICK_STARTS = (
 )
 CENTER_SCHEMAS = ("카드 이용 현황(읍면동)", "내국인 유동인구(읍면동)", "음식물쓰레기 배출 현황")
 HISTORY_LIMIT = 8
+# What to download and where to put it when a public file is missing.
+FILE_GUIDES = {
+    "csv": {
+        "title": "제주데이터허브 상권분석 매쉬업 2019 (CSV)",
+        "url": "https://jejudatahub.net/data/view/data/748",
+        "file": "제주특별자치도_주제3_상권분석을 위한 유동인구에 따른 카드 매출액 변화 데이터 활용_매쉬업결과_19.csv",
+        "place": "원래 파일명 그대로 `data/local/`에 둡니다.",
+    },
+    "xlsx": {
+        "title": "제주관광공사 월별 입도 관광객 확정치 (XLSX)",
+        "url": ARRIVALS_DATASET["reference"],
+        "file": "입도관광객 전체_2026년09월 기준.xlsx",
+        "place": "`data/local/jeju-arrivals.xlsx` 이름으로 저장합니다.",
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +375,9 @@ def render_result(turn: dict, previous: dict | None) -> None:
     plan = turn["plan"]
     if result["status"] != "ok":
         st.error("이 조건으로는 결과를 만들 수 없습니다.")
+        missing = {issue["code"] for issue in result["issues"]} & {"source_unavailable", "arrivals_file_missing"}
+        if missing:
+            render_file_guide(["xlsx" if "arrivals_file_missing" in missing else "csv"])
         dataset = source_for_metrics(plan["metrics"])
         outside = presenter.outside_coverage(plan, dataset["coverage"]) if dataset else []
         if outside:
@@ -533,6 +551,28 @@ def history_label(turn: dict) -> str:
     return "선택지 · " + " · ".join(part for part in parts if part)
 
 
+def missing_files() -> list[str]:
+    return [
+        kind
+        for kind, key in (("csv", "csv_path"), ("xlsx", "arrivals_path"))
+        if not Path(st.session_state.get(key, "")).is_file()
+    ]
+
+
+def render_file_guide(kinds: list[str]) -> None:
+    """Name each missing public file, its official source, and where it goes."""
+    lines = [
+        f"- **{FILE_GUIDES[kind]['title']}** — [공식 페이지]({FILE_GUIDES[kind]['url']})에서 "
+        f"`{FILE_GUIDES[kind]['file']}` 파일을 내려받아 {FILE_GUIDES[kind]['place']}"
+        for kind in kinds
+    ]
+    st.error(
+        "**연결되지 않은 공개 자료가 있습니다.** 아래 파일을 프로젝트 폴더에 둔 뒤 브라우저를 새로 고치세요. "
+        "다른 위치에 둔 파일은 사이드바의 '파일 경로 설정'에 경로를 입력합니다.\n\n" + "\n".join(lines),
+        icon="⛔",
+    )
+
+
 def data_status() -> tuple[str, bool, list[tuple[str, str, bool]]]:
     files = [
         ("상권분석 매쉬업 2019", "읍면동 · 2019-01~2019-12", Path(st.session_state.csv_path).is_file()),
@@ -609,7 +649,7 @@ def main() -> None:
     st.html(brand.header_markup(status, ready))
     answer_scroll_marker()
     if not ready:
-        st.error("연결되지 않은 공개 자료가 있습니다. 왼쪽 '연결된 데이터'와 app/README.md의 준비 절차를 확인해 주세요.", icon="⛔")
+        render_file_guide(missing_files())
 
     if st.session_state.guide:
         render_guide(st.session_state.guide)

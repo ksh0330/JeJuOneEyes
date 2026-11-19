@@ -11,7 +11,9 @@ from functools import lru_cache
 from pathlib import Path
 
 ASSETS = Path(__file__).resolve().parent / "assets"
-LOGO_FILE = ASSETS / "logo.png"
+# Default logo is the dark-navy symbol. logo_blue.png (light-blue symbol) and
+# logo_wordmark.png (horizontal logo with the name) sit beside it for documents.
+LOGO_FILE = ASSETS / "logo_navy.png"
 
 NAME = "제주한눈"
 NAME_EN = "JejuOneEyes"
@@ -47,7 +49,7 @@ LOGO_SVG = f"""<svg viewBox="0 0 120 72" xmlns="http://www.w3.org/2000/svg" role
 
 @lru_cache(maxsize=1)
 def _logo_images():
-    """Trim the white margin of logo.png. Returns (full logo data URI, square mark) or None."""
+    """Trim the white margin of logo_navy.png. Returns (data URI, square tab icon) or None."""
     if not LOGO_FILE.is_file():
         return None
     from PIL import Image, ImageChops
@@ -60,9 +62,10 @@ def _logo_images():
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     uri = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
-    # The mark is the left part of the logo; keep it square for the browser tab icon.
-    mark = image.crop((0, 0, min(image.height, image.width), image.height))
-    return uri, mark
+    side = max(image.size)
+    icon = Image.new("RGBA", (side, side), (255, 255, 255, 0))
+    icon.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
+    return uri, icon
 
 
 def page_icon():
@@ -71,16 +74,15 @@ def page_icon():
 
 
 def logo_markup(*, size: int) -> str:
-    """Logo for the header and sidebar. The PNG already carries the wordmark."""
+    """Symbol and wordmark for the header and sidebar. Falls back to the built-in mark."""
     images = _logo_images()
     if images:
-        return f'<img class="jo-logo-img" src="{images[0]}" alt="{NAME} {NAME_EN}" style="height:{size}px">'
-    # Inline SVG is stripped by the HTML sanitizer, so the mark is embedded as an image.
-    svg = "data:image/svg+xml;base64," + base64.b64encode(LOGO_SVG.encode()).decode()
-    return (
-        f'<img class="jo-mark" src="{svg}" alt="{NAME} 로고" style="width:{size * 5 // 3}px;height:{size}px">'
-        f'<span class="jo-wordmark"><b>{NAME}</b><span>{NAME_EN}</span></span>'
-    )
+        mark = f'<img class="jo-mark" src="{images[0]}" alt="{NAME} 로고" style="height:{size}px;width:auto">'
+    else:
+        # Inline SVG is stripped by the HTML sanitizer, so the mark is embedded as an image.
+        svg = "data:image/svg+xml;base64," + base64.b64encode(LOGO_SVG.encode()).decode()
+        mark = f'<img class="jo-mark" src="{svg}" alt="{NAME} 로고" style="width:{size * 5 // 3}px;height:{size}px">'
+    return mark + f'<span class="jo-wordmark"><b>{NAME}</b><span>{NAME_EN}</span></span>'
 
 
 def header_markup(status: str, ready: bool) -> str:
