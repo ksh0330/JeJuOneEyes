@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "datasets": [
+    {
+      "id": "hub.market_mashup_2019",
+      "title": "제주데이터허브 상권분석 매쉬업 2019",
+      "source_kind": "hub_public_file",
+      "reference": "https://jejudatahub.net/data/view/data/748",
+      "adapter": "hub_market_mashup_csv",
+      "region_scheme": "hub_market_mashup_2019_emd_labels",
+      "region_label": "읍면동",
+      "native_time_grain": "month",
+      "coverage": {"start_month": "2019-01", "end_month": "2019-12"},
+      "columns": {
+        "month": "년월",
+        "city": "시도명",
+        "region": "읍면동명",
+        "industry": "업종명",
+        "sex": "성별",
+        "card_amount": "이용금액",
+        "visit_population": "방문인구"
+      },
+      "metrics": [
+        {
+          "id": "card_amount_krw",
+          "value_column": "card_amount",
+          "unit": "원",
+          "grain": ["city", "region", "month", "industry", "sex"],
+          "aggregation": "sum",
+          "aliases": ["카드", "이용금액", "이용액", "매출"]
+        },
+        {
+          "id": "visit_population_monthly_sum",
+          "value_column": "visit_population",
+          "unit": "방문 유동인구 월 누적 추정치",
+          "grain": ["city", "region", "month", "sex"],
+          "aggregation": "dedupe_equal_then_sum",
+          "aliases": ["방문인구", "방문 인구", "유동인구", "유동 인구"]
+        }
+      ]
+    },
+    {
+      "id": "ijto.monthly_arrivals",
+      "title": "제주관광공사 월별 입도 관광객 확정치",
+      "source_kind": "official_public_file",
+      "reference": "https://data.ijto.or.kr/prog/rpstr/bigdata/sub04_01/view.do?regSn=476",
+      "origin": "제주특별자치도관광협회",
+      "license": "공공누리 제1유형 (출처 표시)",
+      "adapter": "ijto_monthly_arrivals_xlsx",
+      "region_scheme": "jeju_province_total",
+      "region_label": "제주특별자치도 전체",
+      "native_time_grain": "month",
+      "coverage": {"start_month": "2001-01", "end_month": "2026-09"},
+      "columns": {"year": "년도", "month": "월", "segment": "구분", "arrivals": "방문객수"},
+      "metrics": [
+        {
+          "id": "arrivals_total",
+          "value_column": "arrivals",
+          "unit": "명",
+          "grain": ["year", "month", "segment"],
+          "aggregation": "select_total",
+          "aliases": ["입도객", "입도 관광객", "입도관광객"]
+        }
+      ]
+    }
+  ],
+  "joins": []
+}
