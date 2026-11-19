@@ -336,3 +336,83 @@ def outside_coverage(plan: dict, coverage: dict) -> list[str]:
     """Requested months (after exclusions) that fall outside a dataset's registered coverage."""
     requested = [month for month in _plan_months(plan) if int(month[5:]) not in plan["exclude_months"]]
     return [month for month in requested if not coverage["start_month"] <= month <= coverage["end_month"]]
+
+
+# ---------------------------------------------------------------------------
+# 'Read as text' and 'numbers and charts' views. Same result, no recomputation.
+
+
+def _is_arrivals(result: dict) -> bool:
+    return any(column["id"] == ARRIVALS_METRIC for column in result["columns"])
+
+
+def explain_lines(plan: dict, result: dict) -> list[str]:
+    """Plain-language lines under the headline: what was compared, exact values, and limits."""
+    if result["status"] != "ok" or not result["rows"]:
+        return []
+    if _is_arrivals(result):
+        before, current = _arrivals_pair(result)
+        return [
+            f"{_month_label(before['month'])} {korean_number(before[ARRIVALS_METRIC])}명에서 "
+            f"{_month_label(current['month'])} {korean_number(current[ARRIVALS_METRIC])}명으로 바뀌었습니다.",
+            f"정확한 값: {before['month']} {before[ARRIVALS_METRIC]:,}명, {current['month']} {current[ARRIVALS_METRIC]:,}명.",
+            "제주특별자치도 전체의 월별 확정치이며, 지역별·내외국인별 값은 이 비교에 들어가지 않습니다.",
+            "증감의 원인은 이 자료만으로 알 수 없습니다.",
+        ]
+    lines = []
+    regions = list(dict.fromkeys(row.get("region", "전체") for row in result["rows"]))
+    shape = "월별 값" if "month" in dimension_ids(result) else "기간 합계"
+    lines.append(f"{' · '.join(regions)}의 {period_phrase(plan, result)} {shape}를 비교했습니다.")
+    for column in metric_columns(result):
+        totals = sorted(_region_totals(result, column["id"]).items(), key=lambda item: item[1], reverse=True)
+        exact = ", ".join(f"{region} {format_value(value, column['unit'])}" for region, value in totals)
+        lines.append(f"정확한 값({column['label']} 합계): {exact}.")
+    coverage = month_coverage(plan, result)
+    if coverage["excluded"]:
+        dropped = "·".join(str(int(month[5:])) for month in coverage["excluded"])
+        lines.append(f"{dropped}월은 요청에 따라 계산에서 뺐습니다.")
+    if coverage["unobserved"]:
+        lines.append(f"요청 기간 중 {', '.join(coverage['unobserved'])}은 관측값이 없어 계산에 쓰지 못했습니다.")
+    if any(column["id"] == "visit_population_monthly_sum" for column in metric_columns(result)):
+        lines.append("방문 유동인구는 월 누적 추정치이며 고유 방문자 수가 아닙니다.")
+    notice = subtotal_notice(result)
+    if notice:
+        lines.append(notice)
+    lines.append("자료가 보여주는 차이까지만 설명합니다. 원인(점포 수, 관광 수요 등)은 추가 조사가 필요합니다.")
+    return lines
+
+
+def metric_cards(result: dict) -> list[dict]:
+    """Exact value per compared item and the signed difference, for the numbers view."""
+    if result["status"] != "ok" or not result["rows"]:
+        return []
+    if _is_arrivals(result):
+        before, current = _arrivals_pair(result)
+        difference = difference_row(result)
+        return [
+            {"label": f"{before['month']} 입도객", "value": f"{before[ARRIVALS_METRIC]:,}명"},
+            {"label": f"{current['month']} 입도객", "value": f"{current[ARRIVALS_METRIC]:,}명"},
+            {"label": f"차이 ({current['month']} − {before['month']})", "value": next(iter(v for k, v in difference.items() if k != "관측월"))},
+        ]
+    if dimension_ids(result) != ["region"]:
+        return []
+    column = metric_columns(result)[0]
+    cards = [
+        {"label": f"{row['region']} {column['label']}", "value": format_value(row.get(column["id"]), column["unit"])}
+        for row in sorted(result["rows"], key=lambda row: row.get(column["id"]) or 0, reverse=True)
+    ]
+    difference = difference_row(result)
+    if difference:
+        cards.append({"label": difference["지역"], "value": difference[column_header(column)]})
+    return cards
+
+
+def short_value(value, unit: str | None) -> str:
+    """Rounded label for chart bars. Exact values stay in the table."""
+    if value is None:
+        return ""
+    if unit == "원" and abs(value) >= 10**8:
+        return f"{value / 10**8:,.1f}억원"
+    if unit == "명" and abs(value) >= 10**4:
+        return f"{value / 10**4:,.1f}만명"
+    return f"{value:,.0f}"

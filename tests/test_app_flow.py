@@ -62,6 +62,16 @@ class PresenterTest(unittest.TestCase):
             {"지역": "차이 (연동 − 노형동)", "관측된 업종·성별의 카드 이용금액 소계 (원)": "+50원 (+50.0%)"},
         )
 
+    def test_text_and_numbers_views_share_the_same_values(self):
+        plan = {**self.PLAN, "industry_ids": [], "exclude_months": []}
+        lines = presenter.explain_lines(plan, self.RESULT)
+        self.assertIn("정확한 값(관측된 업종·성별의 카드 이용금액 소계 합계): 연동 150원, 노형동 100원.", lines)
+        self.assertIn("관측 소계입니다.", lines)
+        self.assertEqual(
+            [card["value"] for card in presenter.metric_cards(self.RESULT)], ["150원", "100원", "+50원 (+50.0%)"]
+        )
+        self.assertEqual(presenter.short_value(33_833_494_533, "원"), "338.3억원")
+
     def test_arrivals_headline(self):
         result = {
             "status": "ok",
