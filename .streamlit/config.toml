@@ -9,3 +9,19 @@ headless = true
 
 [client]
 toolbarMode = "minimal"
+
+# 차분한 밝은 중립 배경과 청록 포인트. 주 실행 버튼은 primaryColor를 쓴다.
+[theme]
+base = "light"
+primaryColor = "#0F766E"
+backgroundColor = "#F8FAF9"
+secondaryBackgroundColor = "#EAF1EF"
+textColor = "#1F2A30"
+linkColor = "#0F766E"
+borderColor = "#D3DEDA"
+baseRadius = "0.5rem"
+metricValueFontSize = "1.6rem"
+chartCategoricalColors = ["#0F766E", "#B45309", "#475569", "#0E7490"]
+
+[theme.sidebar]
+backgroundColor = "#EEF3F1"

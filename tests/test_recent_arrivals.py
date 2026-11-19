@@ -41,12 +41,21 @@ class RecentArrivalsTest(unittest.TestCase):
         next(button for button in app.button if button.label == "분석하기").click().run()
         self.assertFalse(app.exception)
         text = "\n".join(item.value for item in app.markdown)
-        for value in ("1,181,507명", "1,123,339명", "-58,168명", "-4.92%", "2025-09, 2026-09", "공공누리 제1유형"):
+        for value in ("1,181,507명", "1,123,339명", "2025-09, 2026-09", "공공누리 제1유형"):
             self.assertIn(value, text)
+
+        # Switching to the numbers view reuses the stored result: no new analysis turn.
+        app.session_state["view_mode"] = "수치·그래프로 보기"
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.session_state["turns"]), 1)
+        text = "\n".join(item.value for item in app.markdown)
+        for value in ("-58,168명", "-4.92%"):
+            self.assertIn(value, text)
+        self.assertIn("−58,168명 (−4.92%)", [metric.value for metric in app.metric])
         self.assertIn("2026년 9월 제주 입도객은 112만 3,339명으로, 지난해 같은 달보다 5만 8,168명(4.92%) 줄었습니다.", text)
 
-        app.text_input(key="followup_text").set_value(JOIN_QUESTION)
-        next(button for button in app.button if button.label == "후속 요청 실행").click().run()
+        app.chat_input[0].set_value(JOIN_QUESTION).run()
         self.assertFalse(app.exception)
         warnings = "\n".join(item.value for item in app.warning)
         self.assertIn("지역 단위가 달라", warnings)

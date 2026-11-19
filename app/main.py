@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from app import presenter  # noqa: E402
+from app import charts, presenter  # noqa: E402
 from core.analyzer import run_analysis  # noqa: E402
 from core.analyzer.arrivals import run_arrivals  # noqa: E402
 from core.kg.catalog import ARRIVALS_DATASET, ARRIVALS_ID, ARRIVALS_METRIC, source_for_metrics  # noqa: E402
@@ -36,6 +36,8 @@ ARRIVALS_FILE = DATA_DIR / "jeju-arrivals.xlsx"
 MONTH_OPTIONS = [f"{vocab.DATA_YEAR}-{month:02d}" for month in range(1, 13)]
 SEVERITY_ICON = {"error": "⛔", "warning": "⚠️", "info": "ℹ️"}
 ROLES = ("전체", "소상공인·예비창업자", "도민·학생·지역 연구자", "도내 기업 실무자", "공무원·공공기관 실무자")
+VIEW_TEXT, VIEW_NUMBERS = "글로 보기", "수치·그래프로 보기"
+QUESTION_PLACEHOLDER = "예: 2019년 연동과 노형동의 한식 음식점업 카드 이용금액을 비교해줘"
 ROLE_TAGS = {
     "소상공인·예비창업자": "소상공인",
     "도민·학생·지역 연구자": "도민·연구자",
@@ -85,6 +87,7 @@ def execute(plan: dict) -> dict:
 
 def handle(response, request: str, source: str) -> None:
     """Run a ready plan, park a plan that needs answers, or show why not."""
+    st.session_state.screen_version = st.session_state.get("screen_version", 0) + 1
     st.session_state.notice = []
     st.session_state.guide = None
     if response.status == READY:
@@ -128,13 +131,53 @@ def submit_question() -> None:
     handle(plan_registered_query(text), text, st.session_state.input_source)
 
 
-def submit_followup(text: str | None = None) -> None:
-    text = (text or st.session_state.get("followup_text", "")).strip()
-    if not text:
+def submit_followup(text: str) -> None:
+    text = (text or "").strip()
+    if not text or not st.session_state.turns:
         return
     previous = st.session_state.turns[-1]["plan"]
     handle(plan_registered_query(text, previous), text, "후속 요청")
-    st.session_state.followup_text = ""
+
+
+SCROLL_TO_ANSWER = """
+<script>
+(() => {
+  // The pinned follow-up input keeps the page stuck to the bottom. When a new answer
+  // arrives (the marker version changes), bring its heading into view. Installed once.
+  if (window.__jejuAnswerWatch) return;
+  window.__jejuAnswerWatch = true;
+  let seen = null;
+  const go = () => {
+    const heading = [...document.querySelectorAll("h1, h2, h3")].find((element) =>
+      ["분석 결과", "분석 계획 확인", "두 자료를 결합하지 않았습니다"].some((title) => element.textContent.trim().startsWith(title)));
+    if (!heading) return;
+    // An upward wheel event releases the stick-to-bottom lock before scrolling.
+    const box = document.querySelector('[data-testid="stAppScrollToBottomContainer"]');
+    if (box) box.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, bubbles: true }));
+    heading.scrollIntoView({ block: "start" });
+  };
+  setInterval(() => {
+    const marker = document.querySelector("[data-answer-version]");
+    const version = marker ? marker.dataset.answerVersion : null;
+    if (seen === null) { seen = version; if (version === "0") return; }
+    if (version !== seen) {
+      seen = version;
+      if (version && version !== "0") [50, 400, 1000, 2000].forEach((delay) => setTimeout(go, delay));
+    }
+  }, 250);
+})();
+</script>
+"""
+
+
+def answer_scroll_marker() -> None:
+    version = st.session_state.get("screen_version", 0)
+    st.html(f'<span data-answer-version="{version}"></span>{SCROLL_TO_ANSWER}', unsafe_allow_javascript=True)
+
+
+def _md(text: str) -> str:
+    """Keep '1~12월' from turning into strikethrough in Markdown."""
+    return text.replace("~", "\\~")
 
 
 # ---------------------------------------------------------------------------
@@ -286,49 +329,58 @@ def render_result(turn: dict, previous: dict | None) -> None:
             st.markdown(f"{SEVERITY_ICON.get(issue['severity'], '•')} {issue['message']} `{issue['code']}`")
         return
 
-    st.markdown("#### 요약")
-    for line in presenter.summary_lines(result):
-        st.markdown(f"- {line}")
-    st.caption("요약은 분석 엔진이 반환한 값만 사용합니다. 관찰된 차이의 원인은 추가 조사가 필요합니다.")
+    if st.session_state.get("view_mode", VIEW_TEXT) == VIEW_NUMBERS:
+        render_numbers_view(turn, previous)
+    else:
+        render_text_view(plan, result)
+    render_evidence(plan, result)
 
+
+def render_text_view(plan: dict, result: dict) -> None:
+    """Headline is above; here: plain explanation and one representative chart."""
+    for line in presenter.explain_lines(plan, result):
+        st.markdown(f"- {_md(line)}")
+    metric = presenter.metric_columns(result)[0]
+    st.markdown(f"**대표 그래프 · {presenter.column_header(metric)}**")
+    st.caption(_md(presenter.scope_caption(plan, result)))
+    st.altair_chart(charts.metric_chart(result, metric), width="stretch")
+
+
+def render_numbers_view(turn: dict, previous: dict | None) -> None:
+    """Exact values, units, differences, and comparison time for each target."""
+    result, plan = turn["result"], turn["plan"]
+    scope = _md(presenter.scope_caption(plan, result))
+    cards = presenter.metric_cards(result)
+    if cards:
+        for column, card in zip(st.columns(len(cards)), cards):
+            column.metric(card["label"], card["value"], border=True)
     notice = presenter.subtotal_notice(result)
     if notice:
-        st.warning(f"**관측 소계 안내** · {notice}")
+        st.warning(f"**관측 소계 안내** · {notice}", icon="⚠️")
 
-    scope = presenter.scope_caption(plan, result).replace("~", "\\~")
     st.markdown("#### 결과 표")
     st.caption(scope)
     rows = presenter.table_rows(result)
     difference = presenter.difference_row(result)
     st.dataframe(pd.DataFrame([*rows, difference] if difference else rows), hide_index=True, width="stretch")
+    for line in presenter.summary_lines(result):
+        st.markdown(f"- {_md(line)}")
 
-    st.markdown("#### 차트")
+    st.markdown("#### 그래프")
     st.caption(scope)
-    metrics = presenter.metric_columns(result)
-    chart_cols = st.columns(len(metrics))
-    for column, metric in zip(chart_cols, metrics):
-        with column:
-            st.caption(presenter.column_header(metric))
-            kind, data = presenter.chart_series(result, metric["id"])
-            if kind == "line":
-                frame = pd.DataFrame.from_dict(data, orient="index").sort_index()
-                frame.index.name = "월"
-                st.line_chart(frame)
-            else:
-                frame = pd.DataFrame({presenter.column_header(metric): data})
-                frame.index.name = "비교 월" if metric["id"] == ARRIVALS_METRIC else "지역"
-                st.bar_chart(frame)
+    for metric in presenter.metric_columns(result):
+        st.markdown(f"**{presenter.column_header(metric)}**")
+        st.altair_chart(charts.metric_chart(result, metric), width="stretch")
 
     comparison = presenter.compare_with_previous(previous["result"] if previous else None, result)
     if comparison and turn["changes"]:
         st.markdown("#### 직전 결과와 비교")
         st.dataframe(pd.DataFrame(comparison), hide_index=True, width="stretch")
 
-    render_evidence(plan, result)
-
 
 def render_evidence(plan: dict, result: dict) -> None:
-    st.markdown("#### 근거")
+    st.divider()
+    st.markdown("#### 근거 · 출처와 계산 방법")
     coverage = presenter.month_coverage(plan, result)
     for source in result["sources"]:
         if source["dataset_id"] == ARRIVALS_ID:
@@ -395,66 +447,77 @@ def render_guide(guide: dict) -> None:
     st.divider()
 
 
-def render_faq() -> None:
-    with st.expander("자주 묻는 질문"):
-        st.markdown(
-            f"""
-**이용 가능한 자료는?**
-제주데이터허브 공개 [상권분석 매쉬업](https://jejudatahub.net/data/view/data/748) {vocab.DATA_YEAR}년 CSV는 연동·노형동의 카드 이용금액과 지역 전체 방문 유동인구를 제공합니다. 카드 지표는 한식 음식점업 또는 전체 업종(관측 소계)을 선택할 수 있습니다.
-[제주관광공사 월별 입도 관광객 확정치]({ARRIVALS_DATASET['reference']})는 {ARRIVALS_DATASET['coverage']['start_month']}~{ARRIVALS_DATASET['coverage']['end_month']} 제주 전체 입도객의 전년 동월 비교를 제공합니다.
-두 자료는 지역 단위(읍면동 / 제주 전체)와 관측 기간이 달라 결합 집계를 하지 않습니다.
+def faq_body() -> None:
+    st.markdown(
+        f"""
+**어떤 질문을 할 수 있나요?**
+- 2019년 연동·노형동의 카드 이용금액(한식 음식점업 또는 전체 업종 소계)과 방문 유동인구: 기간 합계 비교, 월별 추이, 특정 달 제외
+- 제주 전체 월별 입도객의 전년 동월 비교({ARRIVALS_DATASET['coverage']['start_month']}~{ARRIVALS_DATASET['coverage']['end_month']} 자료, 2002년 이후 같은 달)
+- 두 자료를 합치는 요청은 결합 가능 여부와 대신 할 수 있는 분석을 안내합니다.
 
 **어떻게 질문하나요?**
-예시 질문을 누르면 입력창에 불러오고, 고쳐 쓴 뒤 '분석하기'를 누릅니다. 지역·업종·지표·기간을 직접 고르려면 '안내형 선택지'를 엽니다(2019년 상권 자료용).
-결과가 나오면 "7~8월 빼고 다시", "노형동만"처럼 후속 요청으로 조건을 바꿉니다. 파일명이나 컬럼명은 몰라도 됩니다.
+질문 입력창에 쓰고 **분석하기** 또는 ⌘+Enter(Windows는 Ctrl+Enter)를 누릅니다. 업무별 예시를 누르면 입력창에 들어오고, 고친 뒤 실행할 수 있습니다.
+결과가 나오면 화면 아래 고정 입력창에 "7~8월 빼고 다시", "노형동만"처럼 후속 질문을 쓰고 Enter를 누릅니다. 파일명이나 컬럼명은 몰라도 됩니다.
+
+**이용 가능한 자료는?**
+제주데이터허브 공개 [상권분석 매쉬업](https://jejudatahub.net/data/view/data/748) {vocab.DATA_YEAR}년 CSV와 [제주관광공사 월별 입도 관광객 확정치]({ARRIVALS_DATASET['reference']})입니다.
+두 자료는 지역 단위(읍면동 / 제주 전체)와 관측 기간이 달라 결합 집계를 하지 않습니다.
 
 **결과의 근거는 어디서 보나요?**
-결과 아래 '근거'에 출처, 실제로 계산에 쓴 관측월, 컬럼별 계산 방법, 품질 알림을 표시합니다.
+결과 아래 '근거'에 출처, 실제로 계산에 쓴 관측월, 제외한 달, 컬럼별 계산 방법, 품질 알림을 표시합니다.
 방문인구는 같은 지역·월·성별 값이 업종 행마다 반복되므로 한 번만 반영하며, 월 누적 추정치이지 고유 방문자 수가 아닙니다.
 
 **결과를 저장·반출할 수 있나요?**
-공개 자료 집계 결과는 '분석 계획·결과 원본'에서 JSON으로 내려받을 수 있습니다.
-센터 원자료를 쓴 결과는 센터의 이용·반출 조건을 따릅니다.
-"""
-        )
+공개 자료 집계 결과는 '분석 계획·결과 원본'에서 JSON으로 내려받을 수 있습니다. 센터 원자료를 쓴 결과는 센터의 이용·반출 조건을 따릅니다.
+""".replace("~", "\\~")
+    )
 
 
 # ---------------------------------------------------------------------------
 # Page
 
 
-def main() -> None:
-    st.set_page_config(page_title="제주 데이터 탐색 Agent", page_icon="📊", layout="wide")
-    init_state()
-
+def render_sidebar() -> None:
     with st.sidebar:
         st.header("데이터 연결")
         st.session_state.setdefault("csv_path", default_csv())
-        st.text_input("공개 CSV 경로 (로컬)", key="csv_path", help=f"data/local/ 에 원래 파일명으로 둔 {vocab.DATA_YEAR}년 CSV")
+        st.text_input("2019년 상권 CSV 경로", key="csv_path", help=f"data/local/ 에 원래 파일명으로 둔 {vocab.DATA_YEAR}년 CSV")
         if Path(st.session_state.csv_path).is_file():
-            st.success("공개 CSV 연결됨")
+            st.success("상권 CSV 연결됨", icon="✅")
         else:
-            st.error("CSV를 찾을 수 없습니다. app/README.md의 준비 절차를 확인해 주세요.")
+            st.error("상권 CSV를 찾을 수 없습니다. app/README.md의 준비 절차를 확인해 주세요.", icon="⛔")
         st.session_state.setdefault("arrivals_path", str(ARRIVALS_FILE))
-        st.text_input("입도객 XLSX 경로 (로컬)", key="arrivals_path")
+        st.text_input("입도객 XLSX 경로", key="arrivals_path")
         if Path(st.session_state.arrivals_path).is_file():
-            st.success("입도객 XLSX 연결됨")
+            st.success("입도객 XLSX 연결됨", icon="✅")
         else:
-            st.caption("전년 동월 비교를 하려면 제주관광공사 XLSX를 연결해 주세요.")
+            st.warning("입도객 비교를 하려면 제주관광공사 XLSX를 연결해 주세요.", icon="⚠️")
         st.caption("질문·원자료·결과는 이 PC에서만 처리하며 외부로 전송하지 않습니다.")
-        st.button("새 분석 시작 (조건 초기화)", on_click=reset_analysis, width="stretch")
-        render_faq()
+        st.header("설정")
+        st.button("새 분석 시작 (조건 초기화)", on_click=reset_analysis, width="stretch", key="reset_sidebar")
+        with st.expander("자주 묻는 질문"):
+            faq_body()
+
+
+def main() -> None:
+    st.set_page_config(page_title="제주 데이터 탐색 Agent", page_icon="📊", layout="wide")
+    init_state()
+    render_sidebar()
+
+    if st.session_state.turns:
+        followup = st.chat_input("후속 질문 (예: 7~8월 빼고 다시) · Enter로 실행")
+        if followup:
+            submit_followup(followup)
 
     st.title("제주 데이터 탐색·분석 Agent")
-    st.caption(
-        "질문을 입력하면 등록된 자료에서 조건을 정리해 집계하고, 표·차트와 근거를 보여줍니다."
-    )
+    st.caption("센터 방문자가 질문하면 등록된 공개 자료에서 조건을 정리해 집계하고, 답과 표·그래프·근거를 보여줍니다.")
 
+    answer_scroll_marker()
     if st.session_state.guide:
         render_guide(st.session_state.guide)
     else:
         for message in st.session_state.notice:
-            st.warning(message)
+            st.warning(message, icon="⚠️")
 
     if st.session_state.pending:
         render_pending()
@@ -467,61 +530,81 @@ def main() -> None:
 
 def render_start() -> None:
     st.subheader("무엇을 알아볼까요?")
-    role = st.radio(
-        "내 업무 · 고른 업무의 예시가 앞에 옵니다. 이용할 수 있는 자료와 분석 범위는 같습니다.",
-        ROLES,
-        horizontal=True,
-        key="role",
+    scope_cols = st.columns(3)
+    scope_cols[0].markdown("**2019년 상권 비교**  \n연동·노형동 카드 이용금액·방문 유동인구, 월별 추이, 특정 달 제외")
+    scope_cols[1].markdown("**입도객 전년 동월 비교**  \n제주 전체 월별 확정치, 2002-01\\~2026-09")
+    scope_cols[2].markdown("**자료 결합 요청**  \n결합할 수 있는지와 각 자료로 대신 할 분석을 안내")
+
+    with st.form("ask_form"):
+        st.text_area("질문", key="question", placeholder=QUESTION_PLACEHOLDER, height=100)
+        button_col, hint_col = st.columns([1, 4], vertical_alignment="center")
+        button_col.form_submit_button("분석하기", type="primary", on_click=submit_question, width="stretch")
+        source = st.session_state.input_source
+        hint = "⌘+Enter(Windows는 Ctrl+Enter)로도 실행합니다."
+        if source.startswith("예시"):
+            hint = "예시 질문을 불러왔습니다. 고친 뒤 분석하기 또는 " + hint[:hint.index("로도")] + "를 누르세요."
+        hint_col.caption(f"{hint} · 입력 방식: {source}")
+
+    tab_examples, tab_choices, tab_faq = st.tabs(
+        ["업무별 예시 질문", "선택지로 고르기 (2019년 상권)", "자주 묻는 질문"], key="start_tabs"
     )
-    if role == "공무원·공공기관 실무자":
-        st.caption(
-            "공공설비 운영 점검(예: 음식물쓰레기 배출량) 질문은 센터 원자료가 연결되어야 분석할 수 있습니다. "
-            "지금은 아래 공개 자료 질문을 실행할 수 있습니다."
+    with tab_examples:
+        role = st.radio(
+            "내 업무 · 고른 업무의 예시가 앞에 옵니다. 이용할 수 있는 자료와 분석 범위는 같습니다.",
+            ROLES,
+            horizontal=True,
+            key="role",
         )
-    registered_examples = (
-        {"text": ARRIVALS_QUESTION, "role": "도내 기업 실무자"},
-        {"text": JOIN_QUESTION, "role": "공무원·공공기관 실무자"},
-    )
-    examples = sorted((*vocab.EXAMPLE_QUESTIONS, *registered_examples), key=lambda example: example["role"] != role)
-    st.markdown("**예시 질문** · 누르면 입력창에 불러와 고쳐 쓸 수 있습니다.")
-    example_cols = st.columns(2)
-    for index, example in enumerate(examples):
-        example_cols[index % 2].button(
-            f":gray-badge[{ROLE_TAGS[example['role']]}] {example['text']}",
-            key=f"example_{index}",
-            on_click=load_example,
-            args=(example["text"],),
-            width="stretch",
-            help=f"{example['role']} 예시 · {example['text']}",
+        if role == "공무원·공공기관 실무자":
+            st.caption(
+                "공공설비 운영 점검(예: 음식물쓰레기 배출량) 질문은 센터 원자료가 연결되어야 분석할 수 있습니다. "
+                "지금은 아래 공개 자료 질문을 실행할 수 있습니다."
+            )
+        registered_examples = (
+            {"text": ARRIVALS_QUESTION, "role": "도내 기업 실무자"},
+            {"text": JOIN_QUESTION, "role": "공무원·공공기관 실무자"},
         )
-    st.text_area(
-        "질문",
-        key="question",
-        placeholder="예: 2019년 연동과 노형동의 한식 음식점업 카드 이용금액을 비교해줘",
-        height=90,
-    )
-    st.caption(f"입력 방식: {st.session_state.input_source}")
-    st.button("분석하기", type="primary", on_click=submit_question)
-    with st.expander("안내형 선택지로 조건 고르기 (2019년 상권 자료)"):
+        examples = sorted((*vocab.EXAMPLE_QUESTIONS, *registered_examples), key=lambda example: example["role"] != role)
+        st.caption("누르면 위 질문 입력창에 들어갑니다. 고친 뒤 실행하세요.")
+        example_cols = st.columns(2)
+        for index, example in enumerate(examples):
+            example_cols[index % 2].button(
+                f":gray-badge[{ROLE_TAGS[example['role']]}] {example['text']}",
+                key=f"example_{index}",
+                on_click=load_example,
+                args=(example["text"],),
+                width="stretch",
+                help=f"{example['role']} 예시 · {example['text']}",
+            )
+    with tab_choices:
         st.caption(
             f"선택지는 {vocab.DATA_YEAR}년 상권분석 매쉬업(연동·노형동의 카드 이용금액·방문 유동인구)용입니다. "
             "입도객 전년 동월 비교는 위 질문 입력창이나 예시 질문으로 실행합니다."
         )
         choices_form("start", None, label="선택한 조건으로 분석")
+    with tab_faq:
+        faq_body()
+
+
+def render_headline(turn: dict) -> None:
+    headline = presenter.headline(turn["plan"], turn["result"])
+    if not headline:
+        return
+    with st.container(border=True):
+        st.markdown("#### " + _md(headline))
+        st.caption("엔진이 계산한 값으로 만든 문장입니다. 자료가 보여주는 변화까지만 설명합니다.")
 
 
 def render_turns() -> None:
     turns = st.session_state.turns
     latest = turns[-1]
     previous = turns[-2] if len(turns) > 1 else None
+    is_arrivals = ARRIVALS_METRIC in latest["plan"]["metrics"]
 
-    st.subheader("현재 분석")
-    headline = presenter.headline(latest["plan"], latest["result"])
-    if headline:
-        with st.container(border=True):
-            st.markdown("##### " + headline.replace("~", "\\~"))
-            st.caption("엔진이 계산한 값으로 만든 문장입니다. 정확한 수치·출처·관측월은 아래 표와 근거에 있습니다.")
+    st.subheader("분석 결과")
+    render_headline(latest)
     st.caption(f"요청: {latest['request']} · 입력 방식: {latest['source']}")
+
     left, right = st.columns([3, 2])
     with left:
         st.markdown("**분석 계획**")
@@ -535,23 +618,28 @@ def render_turns() -> None:
             st.caption("첫 분석입니다.")
         for note in latest["notes"]:
             st.caption(f"ℹ️ {note}")
+
+    if latest["result"]["status"] == "ok":
+        st.segmented_control(
+            "결과 보기 방식 (같은 결과를 다시 계산하지 않고 바꿔 봅니다)",
+            [VIEW_TEXT, VIEW_NUMBERS],
+            default=VIEW_TEXT,
+            required=True,
+            key="view_mode",
+        )
     render_result(latest, previous)
 
     st.divider()
     st.subheader("조건 바꿔 다시 분석")
-    is_arrivals = ARRIVALS_METRIC in latest["plan"]["metrics"]
-    if not is_arrivals:
+    if is_arrivals:
+        st.caption("입도객 비교는 다른 연월을 질문해 다시 실행합니다. 예: 2025년 9월 제주 입도객을 전년 동월과 비교해줘")
+    else:
         suggestion_cols = st.columns(len(vocab.FOLLOWUP_SUGGESTIONS))
         for column, suggestion in zip(suggestion_cols, vocab.FOLLOWUP_SUGGESTIONS):
             column.button(suggestion, key=f"suggest_{suggestion}", on_click=submit_followup, args=(suggestion,), width="stretch")
-    followup_example = (
-        "예: 2025년 9월 제주 입도객을 전년 동월과 비교해줘"
-        if is_arrivals else "예: 7~8월 빼고 다시 / 노형동만 / 방문인구도 같이"
-    )
-    if is_arrivals:
-        st.caption("입도객 비교는 질문으로 다시 요청합니다. 다른 연월을 입력하거나, 상권 분석은 '새 분석 시작' 후 예시나 선택지로 시작하세요.")
-    st.text_input("후속 요청", key="followup_text", placeholder=followup_example)
-    st.button("후속 요청 실행", on_click=submit_followup, type="primary")
+    st.caption("화면 아래 고정 입력창에 후속 질문을 쓰고 Enter를 누르면 직전 조건을 이어서 다시 분석합니다.")
+    action_cols = st.columns([1, 1, 2])
+    action_cols[0].button("새 분석 시작", on_click=reset_analysis, width="stretch", key="reset_main")
     if not is_arrivals:
         with st.expander("선택지로 현재 조건 직접 수정"):
             choices_form(f"edit_{len(turns)}", latest["plan"], label="수정한 조건으로 다시 분석")
@@ -563,7 +651,7 @@ def render_turns() -> None:
                 st.markdown(f"**{number}. {turn['request']}** ({turn['source']})")
                 if turn["changes"]:
                     st.caption(" / ".join(turn["changes"]))
-                st.caption(totals)
+                st.caption(_md(totals))
 
 
 main()
