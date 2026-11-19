@@ -7,6 +7,8 @@ or re-aggregated beyond simple totals over the rows the engine returned.
 from collections import defaultdict
 from datetime import date
 
+from core.kg.catalog import ARRIVALS_METRIC
+
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 SUBTOTAL_CODE = "observed_card_subtotal"
 
@@ -44,10 +46,9 @@ def table_rows(result: dict) -> list[dict]:
 
 
 def chart_series(result: dict, metric_id: str) -> tuple[str, dict]:
-    """Return (kind, data) for one metric.
-
-    kind is "bar" with {region: value} or "line" with {month: {region: value}}.
-    """
+    """Return a categorical comparison or a monthly series for one metric."""
+    if metric_id == ARRIVALS_METRIC:
+        return "bar", {row["month"]: row[metric_id] for row in result["rows"]}
     if "month" in dimension_ids(result):
         series: dict[str, dict[str, float]] = defaultdict(dict)
         for row in result["rows"]:
@@ -68,6 +69,15 @@ def summary_lines(result: dict) -> list[str]:
     """Short answer built only from the returned rows."""
     if result["status"] != "ok":
         return []
+    if any(column["id"] == ARRIVALS_METRIC for column in result["columns"]):
+        before, current = sorted(result["rows"], key=lambda row: row["month"])
+        previous_count, current_count = before[ARRIVALS_METRIC], current[ARRIVALS_METRIC]
+        difference = current_count - previous_count
+        rate = f"{difference / previous_count * 100:+.2f}%" if previous_count else "전년 0명으로 산정 불가"
+        return [
+            f"{before['month']} {previous_count:,}명 → {current['month']} {current_count:,}명",
+            f"전년 동월 대비 {difference:+,}명 (증감률 {rate})",
+        ]
     months = result["sources"][0]["observed_months"] if result["sources"] else []
     span = f"관측 {len(months)}개월({months[0]}~{months[-1]} 중)" if months else "관측월 정보 없음"
     lines = []

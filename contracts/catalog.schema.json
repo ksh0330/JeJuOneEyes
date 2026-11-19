@@ -11,6 +11,7 @@
   },
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+    "month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
     "key": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
     "dataset": {
       "type": "object",
@@ -19,11 +20,23 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "title": { "type": "string", "minLength": 1 },
-        "source_kind": { "enum": ["hub_public_file", "center_local_file"] },
+        "source_kind": { "enum": ["hub_public_file", "center_local_file", "official_public_file"] },
         "reference": { "type": "string", "minLength": 1 },
+        "origin": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
         "adapter": { "$ref": "#/$defs/id" },
         "region_scheme": { "$ref": "#/$defs/id" },
+        "region_label": { "type": "string", "minLength": 1 },
         "native_time_grain": { "enum": ["hour", "day", "month"] },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start_month", "end_month"],
+          "properties": {
+            "start_month": { "$ref": "#/$defs/month" },
+            "end_month": { "$ref": "#/$defs/month" }
+          }
+        },
         "columns": {
           "type": "object",
           "minProperties": 1,
@@ -42,7 +55,8 @@
         "value_column": { "$ref": "#/$defs/id" },
         "unit": { "type": "string", "minLength": 1 },
         "grain": { "$ref": "#/$defs/key" },
-        "aggregation": { "enum": ["sum", "dedupe_equal_then_sum"] }
+        "aggregation": { "enum": ["sum", "dedupe_equal_then_sum", "select_total"] },
+        "aliases": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     },
     "join": {

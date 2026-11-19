@@ -7,15 +7,14 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from core.connectors.market_csv import MarketRow, read_market_rows
+from core.kg.catalog import DATASETS, MARKET_ID
 
 
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 PLAN_VALIDATOR = Draft202012Validator(
     json.loads((CONTRACTS / "analysis-plan.schema.json").read_text(encoding="utf-8"))
 )
-DATASET = json.loads((CONTRACTS / "examples" / "catalog.json").read_text(encoding="utf-8"))[
-    "datasets"
-][0]
+DATASET = DATASETS[MARKET_ID]
 SOURCE_YEAR = 2019
 REGIONS = {"jeju.yeon_dong": "연동", "jeju.nohyeong_dong": "노형동"}
 INDUSTRIES = {"food.korean_restaurant": "한식 음식점업"}
