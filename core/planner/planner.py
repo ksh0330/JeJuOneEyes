@@ -45,6 +45,7 @@ class PlannerResponse:
     clarifications: list[Clarification] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     changes: list[str] = field(default_factory=list)
+    guide: dict | None = None  # structured guidance for requests that span datasets
 
 
 @dataclass

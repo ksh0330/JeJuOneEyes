@@ -46,7 +46,38 @@ class PresenterTest(unittest.TestCase):
             presenter.month_coverage(self.PLAN, self.RESULT),
             {"observed": ["2019-01", "2019-03"], "excluded": ["2019-04"], "unobserved": ["2019-02"]},
         )
-        self.assertIn("연동이(가) 노형동보다 50원 (50.0%) 많습니다.", presenter.summary_lines(self.RESULT)[0])
+        self.assertIn("연동이 노형동보다 50원 (50.0%) 많습니다.", presenter.summary_lines(self.RESULT)[0])
+
+    def test_headline_and_difference_row_use_engine_values(self):
+        self.assertEqual(presenter.korean_number(33_833_494_533), "338억 3,349만 4,533")
+        self.assertEqual(presenter.korean_number(1_123_339), "112만 3,339")
+        plan = {**self.PLAN, "industry_ids": [], "exclude_months": []}
+        self.assertEqual(
+            presenter.headline(plan, self.RESULT),
+            "2019년 1~4월 중 관측된 2개월 관측된 업종·성별의 카드 이용금액 소계는 연동 150원, 노형동 100원으로 "
+            "연동이 노형동보다 50원(50.0%) 많습니다.",
+        )
+        self.assertEqual(
+            presenter.difference_row(self.RESULT),
+            {"지역": "차이 (연동 − 노형동)", "관측된 업종·성별의 카드 이용금액 소계 (원)": "+50원 (+50.0%)"},
+        )
+
+    def test_arrivals_headline(self):
+        result = {
+            "status": "ok",
+            "columns": [
+                {"id": "month", "label": "관측월", "unit": None, "method": None},
+                {"id": "arrivals_total", "label": "입도객", "unit": "명", "method": "m"},
+            ],
+            "rows": [{"month": "2026-09", "arrivals_total": 1_123_339}, {"month": "2025-09", "arrivals_total": 1_181_507}],
+            "sources": [],
+            "issues": [],
+        }
+        self.assertEqual(
+            presenter.headline({}, result),
+            "2026년 9월 제주 입도객은 112만 3,339명으로, 지난해 같은 달보다 5만 8,168명(4.92%) 줄었습니다.",
+        )
+        self.assertEqual(presenter.difference_row(result)["입도객 (명)"], "−58,168명 (−4.92%)")
 
 
 @unittest.skipUnless(CSV, "공개 2019년 CSV가 data/local/에 없습니다.")
@@ -83,6 +114,7 @@ class StreamlitAppTest(unittest.TestCase):
         self.assertFalse(app.exception)
         text = " ".join(item.value for item in app.markdown)
         self.assertIn("33,833,494,533원", text)
+        self.assertIn("2019년 1\\~12월(12개월) 한식 음식점업 카드 이용금액은 연동 338억 3,349만 4,533원", text)
         self.assertIn("출처", text)
         self.assertIn("실제 관측월", text)
 
@@ -90,6 +122,7 @@ class StreamlitAppTest(unittest.TestCase):
         self.assertFalse(app.exception)
         text = " ".join(item.value for item in app.markdown)
         self.assertIn("28,067,882,813원", text)
+        self.assertIn("7·8월을 뺀 10개월", text)
         self.assertIn("제외 조건: 없음 → 7월, 8월 제외", text)
         self.assertIn("요청으로 제외한 달", text)
 

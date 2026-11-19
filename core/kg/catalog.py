@@ -29,18 +29,32 @@ def source_for_metrics(metrics: list[str]) -> dict | None:
     )
 
 
+def dataset_profile(source: dict) -> dict:
+    return {
+        "id": source["id"],
+        "title": source["title"],
+        "region": source["region_label"],
+        "time_grain": f"{TIME_LABELS[source['native_time_grain']]} 단위",
+        "coverage": f"{source['coverage']['start_month']}~{source['coverage']['end_month']}",
+    }
+
+
 def combination_notes(sources: list[dict], requested_months: list[str]) -> list[str]:
     """Compare registered spatial units and observation periods of the selected datasets."""
     descriptions = [
-        f"{source['title']} · {source['region_label']} · {TIME_LABELS[source['native_time_grain']]} 단위 · "
-        f"{source['coverage']['start_month']}~{source['coverage']['end_month']}"
-        for source in sources
+        " · ".join((profile["title"], profile["region"], profile["time_grain"], profile["coverage"]))
+        for profile in map(dataset_profile, sources)
     ]
+    return [*descriptions, *combination_reasons(sources, requested_months)]
+
+
+def combination_reasons(sources: list[dict], requested_months: list[str]) -> list[str]:
     start = max(source["coverage"]["start_month"] for source in sources)
     end = min(source["coverage"]["end_month"] for source in sources)
     reasons = []
     if len({source["region_scheme"] for source in sources}) > 1:
-        reasons.append("지역 단위가 달라 직접 결합할 수 없습니다.")
+        labels = " / ".join(source["region_label"] for source in sources)
+        reasons.append(f"지역 단위가 달라({labels}) 직접 결합할 수 없습니다.")
     if len({source["native_time_grain"] for source in sources}) > 1:
         reasons.append("시간 집계 단위가 달라 직접 결합할 수 없습니다.")
     if start > end:
@@ -56,4 +70,4 @@ def combination_notes(sources: list[dict], requested_months: list[str]) -> list[
     )
     if not verified_join:
         reasons.append("검증된 결합 규칙이 없어 각 자료를 따로 분석해 주세요.")
-    return [*descriptions, *reasons]
+    return reasons
