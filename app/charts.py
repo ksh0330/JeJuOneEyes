@@ -6,9 +6,9 @@ import pandas as pd
 from app import presenter
 from core.kg.catalog import ARRIVALS_METRIC
 
-ACCENT = "#0F766E"
-MUTED = "#94A3B8"
-SERIES = ["#0F766E", "#B45309", "#475569", "#0E7490"]
+ACCENT = "#0F1B2D"
+MUTED = "#9DB3CC"
+SERIES = ["#0F1B2D", "#38BDF8", "#FF7A00", "#64748B"]
 
 
 def _axis(unit: str | None) -> alt.Axis:

@@ -10,18 +10,24 @@ headless = true
 [client]
 toolbarMode = "minimal"
 
-# 차분한 밝은 중립 배경과 청록 포인트. 주 실행 버튼은 primaryColor를 쓴다.
+# 제주한눈 다크 네이비 테마. 강조색(감귤 오렌지)은 상태 배지에만 쓴다. 세부 스타일은 app/brand.py.
 [theme]
 base = "light"
-primaryColor = "#0F766E"
-backgroundColor = "#F8FAF9"
-secondaryBackgroundColor = "#EAF1EF"
-textColor = "#1F2A30"
-linkColor = "#0F766E"
-borderColor = "#D3DEDA"
-baseRadius = "0.5rem"
+primaryColor = "#0F1B2D"
+backgroundColor = "#F5F8FC"
+secondaryBackgroundColor = "#EEF5FF"
+textColor = "#0F172A"
+linkColor = "#0F1B2D"
+borderColor = "#DCE5F0"
+baseRadius = "0.625rem"
+font = "Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif"
 metricValueFontSize = "1.6rem"
-chartCategoricalColors = ["#0F766E", "#B45309", "#475569", "#0E7490"]
+blueColor = "#0369A1"
+orangeColor = "#C2410C"
+grayColor = "#475569"
+violetColor = "#1E2F4A"
+chartCategoricalColors = ["#0F1B2D", "#38BDF8", "#FF7A00", "#64748B"]
 
 [theme.sidebar]
-backgroundColor = "#EEF3F1"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F8FC"
