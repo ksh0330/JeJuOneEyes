@@ -1,0 +1,11 @@
+# 센터 PC 데이터 경계: 사용 통계 전송을 끄고 이 PC에서만 접속한다.
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[server]
+address = "localhost"
+headless = true
+
+[client]
+toolbarMode = "minimal"
